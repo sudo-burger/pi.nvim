@@ -88,14 +88,17 @@ local function finish_session(session, status, opts)
     session.last_error = opts.error
     session_mod.push(session, opts.error)
     ui.update(session)
+    runner.finish(session)
     if opts.notify ~= false then
       vim.notify("pi error: " .. opts.error, vim.log.levels.ERROR)
     end
   elseif status == "error" then
     ui.update(session)
+    runner.finish(session)
   else
     reload_source_buffer(session)
     ui.close(session)
+    runner.finish(session)
   end
 
   if active_session == session then
@@ -149,8 +152,10 @@ local function start_session(message, build_context)
         session.active_tool = nil
         set_status(session, "thinking")
       elseif event.type == "done" then
+        session.saw_terminal_event = true
         finish_session(session, "done")
       elseif event.type == "error" then
+        session.saw_terminal_event = true
         finish_session(session, "error", { error = event.message })
       end
     end,
@@ -176,6 +181,10 @@ local function start_session(message, build_context)
       end
       if result.code ~= 0 and result.code ~= 143 and result.code ~= 124 then
         finish_session(session, "error", { error = "pi exited with code " .. result.code })
+        return
+      end
+      if not session.saw_terminal_event then
+        finish_session(session, "error", { error = "pi exited before completing request" })
         return
       end
       finish_session(session, "done")

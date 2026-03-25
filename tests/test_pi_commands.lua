@@ -38,6 +38,8 @@ local function mock_system()
       on_exit = nil,
       killed = nil,
       closing = false,
+      writes = {},
+      stdin_closed = false,
     }
 
     vim.system = function(cmd, opts, on_exit)
@@ -45,6 +47,9 @@ local function mock_system()
       _G.__pi_test_system.opts = opts
       _G.__pi_test_system.on_exit = on_exit
       return {
+        write = function(_, data)
+          table.insert(_G.__pi_test_system.writes, data)
+        end,
         kill = function(_, signal)
           _G.__pi_test_system.killed = signal
           _G.__pi_test_system.closing = true
@@ -52,6 +57,14 @@ local function mock_system()
         is_closing = function()
           return _G.__pi_test_system.closing
         end,
+        _state = {
+          stdin = {
+            close = function()
+              _G.__pi_test_system.stdin_closed = true
+              _G.__pi_test_system.closing = true
+            end,
+          },
+        },
       }
     end
   ]])
@@ -61,7 +74,10 @@ local function mock_system()
       return child.lua_get([[_G.__pi_test_system.cmd]])
     end,
     get_stdin = function()
-      return child.lua_get([[_G.__pi_test_system.opts.stdin]])
+      return child.lua_get([[table.concat(_G.__pi_test_system.writes, "")]])
+    end,
+    stdin_was_closed = function()
+      return child.lua_get([[_G.__pi_test_system.stdin_closed]])
     end,
     stdout = function(data)
       child.lua([[ _G.__pi_test_system.opts.stdout(nil, ...) ]], { data })
@@ -148,11 +164,13 @@ local function test_pi_ask_uses_vim_system_command()
 
   local system = run_pi_ask("refactor this")
   local cmd = system.get_cmd()
+  local stdin_mode = child.lua_get([[_G.__pi_test_system.opts.stdin]])
 
   MiniTest.expect.equality(cmd[1], "pi")
   MiniTest.expect.equality(cmd[2], "--mode")
   MiniTest.expect.equality(cmd[3], "rpc")
   MiniTest.expect.equality(cmd[4], "--no-session")
+  MiniTest.expect.equality(stdin_mode, true)
 end
 
 local function test_pi_ask_includes_context_and_message()
@@ -220,6 +238,7 @@ local function test_chunked_stdout_updates_and_success_closes_float()
   MiniTest.expect.equality(active_tool, "read_file")
 
   system.stdout('{"type":"agent_end"}\n')
+  MiniTest.expect.equality(system.stdin_was_closed(), true)
   system.exit(0, 0)
 
   MiniTest.expect.equality(child.lua_get([[require("pi").is_running()]]), false)
@@ -232,12 +251,25 @@ local function test_error_keeps_float_open()
 
   local system = run_pi_ask("break")
   system.stdout('{"type":"response","success":false,"error":"boom"}\n')
+  MiniTest.expect.equality(system.stdin_was_closed(), true)
   system.exit(1, 0)
 
   MiniTest.expect.equality(child.lua_get([[require("pi").is_running()]]), false)
   MiniTest.expect.equality(child.lua_get([[require("pi")._get_last_session().status]]), "error")
   MiniTest.expect.equality(child.lua_get([[vim.api.nvim_buf_is_valid(require("pi")._get_last_session().bufnr)]]), true)
   MiniTest.expect.equality(last_notification().msg:match("boom"), "boom")
+end
+
+local function test_clean_exit_without_agent_end_is_an_error()
+  setup_test_env()
+  setup_buffer({ "code" }, "/test/file.lua")
+
+  local system = run_pi_ask("break")
+  system.exit(0, 0)
+
+  MiniTest.expect.equality(child.lua_get([[require("pi").is_running()]]), false)
+  MiniTest.expect.equality(child.lua_get([[require("pi")._get_last_session().status]]), "error")
+  MiniTest.expect.equality(last_notification().msg:match("before completing request"), "before completing request")
 end
 
 local function test_cancel_kills_process_and_closes_immediately()
@@ -319,6 +351,7 @@ T["PiAskSelection"]["uses nearby context"] = test_selection_uses_nearby_context
 T["Session"] = MiniTest.new_set()
 T["Session"]["handles chunked stdout and closes on success"] = test_chunked_stdout_updates_and_success_closes_float
 T["Session"]["keeps float open on error"] = test_error_keeps_float_open
+T["Session"]["clean exit without terminal event is an error"] = test_clean_exit_without_agent_end_is_an_error
 T["Session"]["cancel closes immediately"] = test_cancel_kills_process_and_closes_immediately
 
 return T

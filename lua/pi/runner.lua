@@ -79,7 +79,7 @@ function M.start(session, cmd, payload, handlers)
 
   local ok, process = pcall(vim.system, cmd, {
     text = true,
-    stdin = payload,
+    stdin = true,
     stdout = vim.schedule_wrap(function(err, data)
       if err then
         handlers.on_error(err)
@@ -125,7 +125,28 @@ function M.start(session, cmd, payload, handlers)
     return nil, process
   end
 
+  local wrote, write_err = pcall(process.write, process, payload)
+  if not wrote then
+    pcall(process.kill, process, 15)
+    return nil, write_err
+  end
+
   return process
+end
+
+function M.finish(session)
+  if not session or not session.process then
+    return
+  end
+
+  local stdin = session.process._state and session.process._state.stdin
+  if stdin then
+    pcall(function()
+      stdin:close()
+    end)
+  elseif not session.process:is_closing() then
+    pcall(session.process.kill, session.process, 15)
+  end
 end
 
 function M.cancel(session)

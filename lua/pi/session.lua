@@ -16,6 +16,7 @@ function M.new(source_bufnr)
     ended_at = nil,
     active_tool = nil,
     last_error = nil,
+    saw_terminal_event = false,
     closing = false,
     cancelled = false,
     history = {},
