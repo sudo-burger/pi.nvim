@@ -64,7 +64,7 @@ local function mock_system()
               _G.__pi_test_system.closing = true
             end,
             flush = function()
-              -- Mock flush - no-op in tests
+              -- No-op in tests
             end,
           },
         },

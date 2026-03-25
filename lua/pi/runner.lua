@@ -32,7 +32,7 @@ local function normalize(event)
     return { type = "tool_end", tool = event.toolName or "unknown" }
   end
 
-  if event.type == "agent_end" then
+  if event.type == "agent_end" or event.type == "turn_end" then
     return { type = "done" }
   end
 
@@ -131,14 +131,6 @@ function M.start(session, cmd, payload, handlers)
     return nil, write_err
   end
 
-  -- Flush stdin to ensure payload is sent immediately to pi
-  local stdin = process._state and process._state.stdin
-  if stdin then
-    pcall(function()
-      stdin:flush()
-    end)
-  end
-
   return process
 end
 
@@ -150,7 +142,6 @@ function M.finish(session)
   local stdin = session.process._state and session.process._state.stdin
   if stdin then
     pcall(function()
-      stdin:flush()
       stdin:close()
     end)
   elseif not session.process:is_closing() then
