@@ -8,6 +8,9 @@ M.defaults = {
   selection_context_lines = 40,
   focus_ui = false,
   log_path = "/tmp/pi-nvim.log",
+  skills = true,
+  extensions = true,
+  tools = true,
 }
 
 local values = vim.deepcopy(M.defaults)
@@ -30,6 +33,15 @@ function M.validate(opts)
   end
   if opts.focus_ui ~= nil and type(opts.focus_ui) ~= "boolean" then
     error("pi.nvim: focus_ui must be a boolean")
+  end
+  if opts.skills ~= nil and type(opts.skills) ~= "boolean" then
+    error("pi.nvim: skills must be a boolean")
+  end
+  if opts.extensions ~= nil and type(opts.extensions) ~= "boolean" then
+    error("pi.nvim: extensions must be a boolean")
+  end
+  if opts.tools ~= nil and type(opts.tools) ~= "boolean" then
+    error("pi.nvim: tools must be a boolean")
   end
 end
 

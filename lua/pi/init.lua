@@ -27,7 +27,16 @@ end
 
 local function get_pi_cmd()
   local cfg = config.get()
-  local cmd = { "pi", "--mode", "rpc", "--no-session", "--no-extensions", "--no-skills" }
+  local cmd = { "pi", "--mode", "rpc", "--no-session" }
+  if not cfg.extensions then
+    table.insert(cmd, "--no-extensions")
+  end
+  if not cfg.skills then
+    table.insert(cmd, "--no-skills")
+  end
+  if not cfg.tools then
+    table.insert(cmd, "--no-tools")
+  end
   if cfg.provider then
     table.insert(cmd, "--provider")
     table.insert(cmd, cfg.provider)

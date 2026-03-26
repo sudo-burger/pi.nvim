@@ -60,10 +60,19 @@ require("pi").setup({
   max_context_bytes = 24000,
   selection_context_lines = 40,
   log_path = "/tmp/pi-nvim.log",
+  skills = true,
+  extensions = true,
+  tools = true,
 })
 ```
 
 The `log_path` setting controls where all sessions are logged. Set to `nil` or empty string to disable logging. Default: `/tmp/pi-nvim.log`.
+
+The `skills` setting controls whether pi discovers and loads skills (`--no-skills`). Default: `true`.
+
+The `extensions` setting controls whether pi discovers and loads extensions (`--no-extensions`). Default: `true`.
+
+The `tools` setting controls whether pi enables built-in tools (`--no-tools`). Default: `true`.
 
 Use `pi --list-models` to see available models.
 
