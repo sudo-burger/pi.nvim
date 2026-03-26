@@ -173,8 +173,6 @@ local function test_pi_ask_uses_vim_system_command()
   MiniTest.expect.equality(cmd[2], "--mode")
   MiniTest.expect.equality(cmd[3], "rpc")
   MiniTest.expect.equality(cmd[4], "--no-session")
-  MiniTest.expect.equality(cmd[5], "--no-extensions")
-  MiniTest.expect.equality(cmd[6], "--no-skills")
   MiniTest.expect.equality(stdin_mode, true)
 end
 
@@ -290,6 +288,60 @@ local function test_cancel_kills_process_and_closes_immediately()
   MiniTest.expect.equality(child.lua_get([[require("pi")._get_last_session().bufnr == nil]]), true)
 end
 
+local function test_skills_option_disables_skills()
+  setup_test_env('require("pi").setup({ skills = false })')
+  setup_buffer({ "code" }, "/test/file.lua")
+
+  local system = run_pi_ask("test")
+  local cmd = system.get_cmd()
+
+  -- Check that --no-skills is in the command
+  local has_no_skills = false
+  for _, arg in ipairs(cmd) do
+    if arg == "--no-skills" then
+      has_no_skills = true
+      break
+    end
+  end
+  MiniTest.expect.equality(has_no_skills, true)
+end
+
+local function test_extensions_option_disables_extensions()
+  setup_test_env('require("pi").setup({ extensions = false })')
+  setup_buffer({ "code" }, "/test/file.lua")
+
+  local system = run_pi_ask("test")
+  local cmd = system.get_cmd()
+
+  -- Check that --no-extensions is in the command
+  local has_no_extensions = false
+  for _, arg in ipairs(cmd) do
+    if arg == "--no-extensions" then
+      has_no_extensions = true
+      break
+    end
+  end
+  MiniTest.expect.equality(has_no_extensions, true)
+end
+
+local function test_tools_option_disables_tools()
+  setup_test_env('require("pi").setup({ tools = false })')
+  setup_buffer({ "code" }, "/test/file.lua")
+
+  local system = run_pi_ask("test")
+  local cmd = system.get_cmd()
+
+  -- Check that --no-tools is in the command
+  local has_no_tools = false
+  for _, arg in ipairs(cmd) do
+    if arg == "--no-tools" then
+      has_no_tools = true
+      break
+    end
+  end
+  MiniTest.expect.equality(has_no_tools, true)
+end
+
 local function test_second_request_is_blocked_while_running()
   setup_test_env()
   setup_buffer({ "code" }, "/test/file.lua")
@@ -349,6 +401,9 @@ T["PiAsk"]["trims context for speed"] = test_context_is_trimmed_for_speed
 T["PiAsk"]["blocks second request while running"] = test_second_request_is_blocked_while_running
 T["PiAsk"]["does not reset modified buffer on success"] = test_success_does_not_reset_modified_buffer
 T["PiAsk"]["reloads unmodified buffer on success"] = test_success_reloads_unmodified_buffer
+T["PiAsk"]["skills option disables skills"] = test_skills_option_disables_skills
+T["PiAsk"]["extensions option disables extensions"] = test_extensions_option_disables_extensions
+T["PiAsk"]["tools option disables tools"] = test_tools_option_disables_tools
 
 T["PiAskSelection"] = MiniTest.new_set()
 T["PiAskSelection"]["uses nearby context"] = test_selection_uses_nearby_context
