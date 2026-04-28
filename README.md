@@ -12,7 +12,7 @@ It's funny that all AI plugins for Neovim are quite complex to interact with, li
 
 ## Features
 
-- **Context aware**: Sends your current buffer + selection as context.
+- **Context aware**: Sends your current buffer, cwd, and selection as context.
 - **Simple configuration**: Just set your preferred AI model.
 - **Gets out of your way**: You ask it. It does it. Done.
 
@@ -121,9 +121,8 @@ vim.keymap.set("v", "<leader>ai", ":PiAskSelection<CR>", { desc = "Ask pi (selec
 ## Behavior
 
 - Runs asynchronously and keeps editing nonblocking.
-- Shows a small floating status window while pi is running.
-- Closes the float automatically on success.
-- Keeps the float open on error so you can inspect the failure.
+- Uses `nvim-notify` for status updates when available; otherwise falls back to a small floating status window.
+- Reloads changed loaded buffers on success so pi's on-disk edits are reflected in Neovim.
 - Trims oversized context for speed instead of always sending the full file.
 
 
