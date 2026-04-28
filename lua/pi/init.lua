@@ -59,29 +59,77 @@ local function set_status(session, status, message)
   ui.update(session)
 end
 
-local function reload_source_buffer(session)
-  local bufnr = session.source_bufnr
-  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
-    return
+local function normalize_path(path)
+  return vim.fn.fnamemodify(path, ":p")
+end
+
+local function file_signature(path)
+  local stat = vim.loop.fs_stat(path)
+  if not stat or stat.type ~= "file" then
+    return nil
   end
-  if vim.bo[bufnr].modified then
-    return
+
+  return {
+    size = stat.size,
+    mtime_sec = stat.mtime and stat.mtime.sec or 0,
+    mtime_nsec = stat.mtime and stat.mtime.nsec or 0,
+  }
+end
+
+local function signatures_equal(a, b)
+  if not a or not b then
+    return a == b
   end
-  if not context.buffer_is_file_backed(bufnr) then
-    return
+
+  return a.size == b.size and a.mtime_sec == b.mtime_sec and a.mtime_nsec == b.mtime_nsec
+end
+
+local function snapshot_loaded_file_buffers()
+  local snapshots = {}
+
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(bufnr) and context.buffer_is_file_backed(bufnr) then
+      local path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
+      snapshots[path] = file_signature(path)
+    end
   end
-  local path = vim.api.nvim_buf_get_name(bufnr)
+
+  return snapshots
+end
+
+local function reload_buffer_from_disk(bufnr, path)
   if vim.fn.filereadable(path) ~= 1 then
-    return
+    return false
   end
 
   local ok, lines = pcall(vim.fn.readfile, path)
   if not ok then
-    return
+    return false
   end
 
+  local was_modifiable = vim.bo[bufnr].modifiable
+  vim.bo[bufnr].modifiable = true
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
   vim.bo[bufnr].modified = false
+  vim.bo[bufnr].modifiable = was_modifiable
+
+  return true
+end
+
+local function reload_changed_file_buffers(session)
+  local before_snapshots = session.file_snapshots or {}
+
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(bufnr) and context.buffer_is_file_backed(bufnr) then
+      local path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
+      local before = before_snapshots[path]
+      local after = file_signature(path)
+
+      if not signatures_equal(before, after) then
+        reload_buffer_from_disk(bufnr, path)
+      end
+    end
+  end
 end
 
 local function finish_session(session, status, opts)
@@ -99,14 +147,11 @@ local function finish_session(session, status, opts)
     session_mod.push(session, opts.error)
     ui.update(session)
     runner.finish(session)
-    if opts.notify ~= false then
-      vim.notify("pi error: " .. opts.error, vim.log.levels.ERROR)
-    end
   elseif status == "error" then
     ui.update(session)
     runner.finish(session)
   else
-    reload_source_buffer(session)
+    reload_changed_file_buffers(session)
     ui.close(session)
     runner.finish(session)
   end
@@ -116,14 +161,7 @@ local function finish_session(session, status, opts)
   end
   last_session = session
 
-  -- Log the session
-  log.append_session(
-    config.get().log_path,
-    session,
-    session.last_message,
-    status,
-    session.source_path
-  )
+  log.append_session(config.get().log_path, session, session.last_message, status, session.source_path)
 end
 
 local function start_session(message, build_context)
@@ -139,6 +177,7 @@ local function start_session(message, build_context)
 
   local source_bufnr = vim.api.nvim_get_current_buf()
   local session = session_mod.new(source_bufnr)
+  session.file_snapshots = snapshot_loaded_file_buffers()
   session.last_message = message
   active_session = session
   last_session = session
@@ -287,7 +326,6 @@ function M.show_log()
     return
   end
 
-  -- Check if file exists
   if vim.fn.filereadable(log_path) == 0 then
     vim.notify("pi.nvim: log file not found at " .. log_path, vim.log.levels.INFO)
     return

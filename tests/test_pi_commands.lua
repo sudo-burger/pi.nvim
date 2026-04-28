@@ -10,6 +10,7 @@ local function setup_test_env(setup_code)
   child.restart({ "-u", "tests/minimal_init.lua" })
   child.lua([[
     _G.__pi_test_notifications = {}
+    _G.__pi_force_notify_backend = true
     vim.notify = function(msg, level)
       table.insert(_G.__pi_test_notifications, { msg = msg, level = level })
     end
@@ -227,7 +228,7 @@ local function test_selection_uses_nearby_context()
   MiniTest.expect.equality(prompt.message:match("line6"), nil)
 end
 
-local function test_chunked_stdout_updates_and_success_closes_float()
+local function test_chunked_stdout_updates_and_success_notifies_done()
   setup_test_env()
   setup_buffer({ "code" }, "/test/file.lua")
 
@@ -248,7 +249,7 @@ local function test_chunked_stdout_updates_and_success_closes_float()
   MiniTest.expect.equality(child.lua_get([[require("pi")._get_last_session().bufnr == nil]]), true)
 end
 
-local function test_error_keeps_float_open()
+local function test_error_notifies_and_clears_ui_state()
   setup_test_env()
   setup_buffer({ "code" }, "/test/file.lua")
 
@@ -259,7 +260,7 @@ local function test_error_keeps_float_open()
 
   MiniTest.expect.equality(child.lua_get([[require("pi").is_running()]]), false)
   MiniTest.expect.equality(child.lua_get([[require("pi")._get_last_session().status]]), "error")
-  MiniTest.expect.equality(child.lua_get([[vim.api.nvim_buf_is_valid(require("pi")._get_last_session().bufnr)]]), true)
+  MiniTest.expect.equality(child.lua_get([[require("pi")._get_last_session().bufnr == nil]]), true)
   MiniTest.expect.equality(last_notification().msg:match("boom"), "boom")
 end
 
@@ -400,7 +401,7 @@ local function test_second_request_is_blocked_while_running()
   MiniTest.expect.equality(notification.msg:match("already running"), "already running")
 end
 
-local function test_success_does_not_reset_modified_buffer()
+local function test_success_overwrites_modified_buffer_with_disk_edits()
   setup_test_env()
   local file = child.lua_get([[vim.fn.tempname() .. ".lua"]])
   write_file(file, { "from disk" })
@@ -412,9 +413,40 @@ local function test_success_does_not_reset_modified_buffer()
   system.stdout('{"type":"agent_end"}\n')
   system.exit(0, 0)
 
-  MiniTest.expect.equality(child.lua_get([[vim.bo.modified]]), true)
+  MiniTest.expect.equality(child.lua_get([[vim.bo.modified]]), false)
   local lines = child.lua_get([[vim.api.nvim_buf_get_lines(0, 0, -1, false)]])
-  MiniTest.expect.equality(lines[1], "code")
+  MiniTest.expect.equality(lines[1], "updated on disk")
+end
+
+local function test_success_reloads_all_changed_loaded_buffers()
+  setup_test_env()
+  local file_one = child.lua_get([[vim.fn.tempname() .. ".lua"]])
+  local file_two = child.lua_get([[vim.fn.tempname() .. ".lua"]])
+  write_file(file_one, { "one before" })
+  write_file(file_two, { "two before" })
+  setup_buffer({ "one buffer edit" }, file_one)
+  child.lua([[vim.cmd("edit " .. ...)]], { file_two })
+  child.lua([[vim.api.nvim_buf_set_lines(0, 0, -1, false, { "two buffer edit" })]])
+  child.lua([[vim.bo.modified = true]])
+  child.lua([[vim.cmd("buffer #")]])
+  child.lua([[vim.bo.modified = true]])
+
+  local system = run_pi_ask("finish")
+  write_file(file_one, { "one after agent edit" })
+  write_file(file_two, { "two after agent edit" })
+  system.stdout('{"type":"agent_end"}\n')
+  system.exit(0, 0)
+
+  local buffers = child.lua_get([[{
+    one = vim.api.nvim_buf_get_lines(vim.fn.bufnr(...), 0, -1, false),
+    one_modified = vim.bo[vim.fn.bufnr(...)].modified,
+    two = vim.api.nvim_buf_get_lines(vim.fn.bufnr(select(2, ...)), 0, -1, false),
+    two_modified = vim.bo[vim.fn.bufnr(select(2, ...))].modified,
+  }]], { file_one, file_two })
+  MiniTest.expect.equality(buffers.one[1], "one after agent edit")
+  MiniTest.expect.equality(buffers.one_modified, false)
+  MiniTest.expect.equality(buffers.two[1], "two after agent edit")
+  MiniTest.expect.equality(buffers.two_modified, false)
 end
 
 local function test_success_reloads_unmodified_buffer()
@@ -441,8 +473,9 @@ T["PiAsk"]["includes prompt message and context"] = test_pi_ask_includes_context
 T["PiAsk"]["requires a file"] = test_pi_ask_requires_file
 T["PiAsk"]["trims context for speed"] = test_context_is_trimmed_for_speed
 T["PiAsk"]["blocks second request while running"] = test_second_request_is_blocked_while_running
-T["PiAsk"]["does not reset modified buffer on success"] = test_success_does_not_reset_modified_buffer
+T["PiAsk"]["overwrites modified buffer with disk edits on success"] = test_success_overwrites_modified_buffer_with_disk_edits
 T["PiAsk"]["reloads unmodified buffer on success"] = test_success_reloads_unmodified_buffer
+T["PiAsk"]["reloads all changed loaded buffers on success"] = test_success_reloads_all_changed_loaded_buffers
 T["PiAsk"]["skills option disables skills"] = test_skills_option_disables_skills
 T["PiAsk"]["extensions option disables extensions"] = test_extensions_option_disables_extensions
 T["PiAsk"]["tools option disables tools"] = test_tools_option_disables_tools
@@ -451,8 +484,8 @@ T["PiAskSelection"] = MiniTest.new_set()
 T["PiAskSelection"]["uses nearby context"] = test_selection_uses_nearby_context
 
 T["Session"] = MiniTest.new_set()
-T["Session"]["handles chunked stdout and closes on success"] = test_chunked_stdout_updates_and_success_closes_float
-T["Session"]["keeps float open on error"] = test_error_keeps_float_open
+T["Session"]["handles chunked stdout and notifies on success"] = test_chunked_stdout_updates_and_success_notifies_done
+T["Session"]["notifies and clears UI state on error"] = test_error_notifies_and_clears_ui_state
 T["Session"]["clean exit without terminal event is an error"] = test_clean_exit_without_agent_end_is_an_error
 T["Session"]["turn_end does not finish session (multi-turn tool use)"] = test_turn_end_does_not_finish_session
 T["Session"]["turn_end followed by agent_end completes"] = test_turn_end_followed_by_agent_end_completes

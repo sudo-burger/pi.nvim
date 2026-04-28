@@ -10,6 +10,13 @@ local active_statuses = {
   applying = true,
 }
 
+local function has_rich_notify()
+  if _G.__pi_force_notify_backend then
+    return true
+  end
+  return package.loaded.notify ~= nil or pcall(require, "notify")
+end
+
 local function is_session_window_valid(session)
   return session and session.winnr and vim.api.nvim_win_is_valid(session.winnr)
 end
@@ -20,37 +27,81 @@ end
 
 local function title_for(session)
   if session.status == "error" then
-    return " pi error "
+    return session.ui_backend == "notify" and "pi error" or " pi error "
   end
-  return " pi "
+  return session.ui_backend == "notify" and "pi" or " pi "
 end
 
 local function status_line(session)
   local prefix = ""
-  if session.status == "thinking" or session.status == "collecting_context" or session.status == "starting" or session.status == "running_tool" or session.status == "applying" then
+  if session.ui_backend == "float" and active_statuses[session.status] then
     session.spinner_idx = ((session.spinner_idx or 0) % #spinner) + 1
     prefix = spinner[session.spinner_idx] .. " "
   end
 
   if session.status == "running_tool" and session.active_tool then
-    return prefix .. "Running tool: " .. session.active_tool
+    return prefix .. (session.ui_backend == "notify" and "Pi calling tool: " or "Running tool: ") .. session.active_tool
   end
 
-  local labels = {
+  local notify_labels = {
+    collecting_context = "Pi collecting context...",
+    starting = "Pi starting...",
+    thinking = "Pi thinking...",
+    running_tool = "Pi calling tool...",
+    applying = "Pi applying edits...",
+    done = "Pi done",
+    error = session.last_error or "pi failed",
+    cancelled = "Pi cancelled",
+  }
+
+  local float_labels = {
     idle = "Idle",
     collecting_context = "Collecting context...",
     starting = "Starting pi...",
     thinking = "Thinking...",
+    running_tool = "Running tool...",
     applying = "Applying edits...",
     done = "Done",
     error = session.last_error or "pi failed",
     cancelled = "Cancelled",
   }
 
-  return prefix .. (labels[session.status] or session.status)
+  local labels = session.ui_backend == "notify" and notify_labels or float_labels
+  local message = labels[session.status]
+  if not message then
+    return nil
+  end
+  return prefix .. message
 end
 
-local function render(session)
+local function notification_level(session)
+  if session.status == "error" then
+    return vim.log.levels.ERROR
+  end
+  if session.status == "cancelled" then
+    return vim.log.levels.WARN
+  end
+  return vim.log.levels.INFO
+end
+
+local function render_notify(session)
+  local message = status_line(session)
+  if not message then
+    return
+  end
+
+  local signature = session.status .. "|" .. (session.active_tool or "") .. "|" .. (session.last_error or "")
+  if session.last_notified_signature == signature then
+    return
+  end
+  session.last_notified_signature = signature
+
+  vim.notify(message, notification_level(session), {
+    title = title_for(session),
+  })
+end
+
+local function render_float(session)
   if not is_session_buffer_valid(session) then
     return
   end
@@ -73,6 +124,14 @@ local function render(session)
   end
 end
 
+local function render(session)
+  if session.ui_backend == "notify" then
+    render_notify(session)
+  else
+    render_float(session)
+  end
+end
+
 local function stop_timer(session)
   if session.ui_timer then
     session.ui_timer:stop()
@@ -82,7 +141,7 @@ local function stop_timer(session)
 end
 
 local function ensure_timer(session)
-  if session.ui_timer or not active_statuses[session.status] then
+  if session.ui_backend ~= "float" or session.ui_timer or not active_statuses[session.status] then
     return
   end
 
@@ -96,7 +155,7 @@ local function ensure_timer(session)
   end))
 end
 
-function M.open(session, focus)
+local function open_float(session, focus)
   local width = math.min(60, math.max(40, math.floor(vim.o.columns * 0.45)))
   local height = 4
   local row = math.floor((vim.o.lines - height) / 2)
@@ -125,6 +184,17 @@ function M.open(session, focus)
   vim.wo[session.winnr].wrap = true
   vim.wo[session.winnr].linebreak = true
   vim.wo[session.winnr].winfixbuf = true
+end
+
+function M.open(session, focus)
+  session.ui_backend = has_rich_notify() and "notify" or "float"
+
+  if session.ui_backend == "float" then
+    open_float(session, focus)
+  else
+    session.winnr = nil
+    session.bufnr = nil
+  end
 
   render(session)
   ensure_timer(session)
@@ -141,14 +211,32 @@ end
 
 function M.close(session)
   stop_timer(session)
-  if is_session_window_valid(session) then
-    pcall(vim.api.nvim_win_close, session.winnr, true)
+
+  if session.ui_backend == "float" then
+    if is_session_window_valid(session) then
+      pcall(vim.api.nvim_win_close, session.winnr, true)
+    end
+    if is_session_buffer_valid(session) then
+      pcall(vim.api.nvim_buf_delete, session.bufnr, { force = true })
+    end
+    session.winnr = nil
+    session.bufnr = nil
+    return
   end
-  if is_session_buffer_valid(session) then
-    pcall(vim.api.nvim_buf_delete, session.bufnr, { force = true })
-  end
+
   session.winnr = nil
   session.bufnr = nil
+
+  if session.cancelled then
+    session.status = "cancelled"
+    render(session)
+    return
+  end
+
+  if session.status ~= "error" then
+    session.status = "done"
+    render(session)
+  end
 end
 
 return M
