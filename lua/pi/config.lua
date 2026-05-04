@@ -5,11 +5,15 @@ M.defaults = {
   model = nil,
   system_prompt = nil,
   append_system_prompt = nil,
-  max_context_lines = 300,
-  max_context_bytes = 24000,
-  selection_context_lines = 40,
-  focus_ui = false,
-  log_path = "/tmp/pi-nvim.log",
+  context = {
+    max_bytes = 24000,
+    ask = {
+      surrounding_lines = 80,
+    },
+    selection = {
+      surrounding_lines = 40,
+    },
+  },
   skills = true,
   extensions = true,
   tools = true,
@@ -24,17 +28,30 @@ local function validate_number(name, value)
 end
 
 function M.validate(opts)
-  if opts.max_context_lines ~= nil then
-    validate_number("max_context_lines", opts.max_context_lines)
-  end
-  if opts.max_context_bytes ~= nil then
-    validate_number("max_context_bytes", opts.max_context_bytes)
-  end
-  if opts.selection_context_lines ~= nil then
-    validate_number("selection_context_lines", opts.selection_context_lines)
-  end
-  if opts.focus_ui ~= nil and type(opts.focus_ui) ~= "boolean" then
-    error("pi.nvim: focus_ui must be a boolean")
+  local context = opts.context
+  if context ~= nil then
+    if type(context) ~= "table" then
+      error("pi.nvim: context must be a table")
+    end
+    if context.max_bytes ~= nil then
+      validate_number("context.max_bytes", context.max_bytes)
+    end
+    if context.ask ~= nil then
+      if type(context.ask) ~= "table" then
+        error("pi.nvim: context.ask must be a table")
+      end
+      if context.ask.surrounding_lines ~= nil then
+        validate_number("context.ask.surrounding_lines", context.ask.surrounding_lines)
+      end
+    end
+    if context.selection ~= nil then
+      if type(context.selection) ~= "table" then
+        error("pi.nvim: context.selection must be a table")
+      end
+      if context.selection.surrounding_lines ~= nil then
+        validate_number("context.selection.surrounding_lines", context.selection.surrounding_lines)
+      end
+    end
   end
   if opts.skills ~= nil and type(opts.skills) ~= "boolean" then
     error("pi.nvim: skills must be a boolean")
@@ -56,7 +73,7 @@ end
 function M.setup(opts)
   opts = opts or {}
   M.validate(opts)
-  values = vim.tbl_extend("force", vim.deepcopy(M.defaults), opts)
+  values = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
   return values
 end
 

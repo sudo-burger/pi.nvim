@@ -44,13 +44,13 @@ MiniDeps.add("pablopunk/pi.nvim")
 
 ## Config
 
-Provider and model are optional - pi will use your default configuration if not specified:
+All config is optional:
 
 ```lua
 require("pi").setup()
 ```
 
-Or override with specific values:
+Override only what you need:
 
 ```lua
 require("pi").setup({
@@ -58,27 +58,33 @@ require("pi").setup({
   model = "openrouter/free",
   system_prompt = "You are a helpful assistant.",
   append_system_prompt = "Always respond concisely.",
-  max_context_lines = 300,
-  max_context_bytes = 24000,
-  selection_context_lines = 40,
-  log_path = "/tmp/pi-nvim.log",
+  context = {
+    max_bytes = 24000,
+    ask = {
+      surrounding_lines = 80,
+    },
+    selection = {
+      surrounding_lines = 40,
+    },
+  },
   skills = true,
   extensions = true,
   tools = true,
 })
 ```
 
-The `log_path` setting controls where all sessions are logged. Set to `nil` or empty string to disable logging. Default: `/tmp/pi-nvim.log`.
-
-The `skills` setting controls whether pi discovers and loads skills (`--no-skills`). Default: `true`.
-
-The `extensions` setting controls whether pi discovers and loads extensions (`--no-extensions`). Default: `true`.
-
-The `tools` setting controls whether pi enables built-in tools (`--no-tools`). Default: `true`.
-
-The `system_prompt` setting passes a custom system prompt to pi (`--system-prompt`). Default: `nil` (uses pi's default system prompt). Use with care, since this overrides pi's generated baseline instructions.
-
-The `append_system_prompt` setting appends text to the system prompt (`--append-system-prompt`). pi.nvim always appends its non-interactive execution instruction, and this option is concatenated after it. Default: `nil`.
+| Prop | Default | Description |
+|------|---------|-------------|
+| `provider` | `nil` | pi provider to use. If omitted, pi uses its own default configuration. |
+| `model` | `nil` | Model name to use. If omitted, pi uses its own default configuration. |
+| `system_prompt` | `nil` | Passes a custom system prompt to pi (`--system-prompt`). Use with care, since this overrides pi's generated baseline instructions. |
+| `append_system_prompt` | `nil` | Appends text to the system prompt (`--append-system-prompt`). pi.nvim always appends its non-interactive execution instruction, and this option is concatenated after it. |
+| `context.max_bytes` | `24000` | Maximum size in bytes for sent context before trimming. |
+| `context.ask.surrounding_lines` | `80` | Number of lines before and after the current cursor line to include for `:PiAsk`. |
+| `context.selection.surrounding_lines` | `40` | Number of lines before and after the current visual selection to include for `:PiAskSelection`. |
+| `skills` | `true` | Whether pi discovers and loads skills. Set to `false` to pass `--no-skills`. |
+| `extensions` | `true` | Whether pi discovers and loads extensions. Set to `false` to pass `--no-extensions`. |
+| `tools` | `true` | Whether pi enables built-in tools. Set to `false` to pass `--no-tools`. |
 
 Use `pi --list-models` to see available models.
 

@@ -59,11 +59,10 @@ local function filetype_for(bufnr)
   return vim.bo[bufnr].filetype ~= "" and vim.bo[bufnr].filetype or "text"
 end
 
-local function limit_lines(lines, max_lines)
-  if #lines <= max_lines then
-    return vim.deepcopy(lines), false
-  end
-  return vim.list_slice(lines, 1, max_lines), true
+local function slice_lines_around(lines, center_line, surrounding_lines)
+  local start_line = math.max(1, center_line - surrounding_lines)
+  local end_line = math.min(#lines, center_line + surrounding_lines)
+  return vim.list_slice(lines, start_line, end_line), start_line, end_line
 end
 
 local function truncate_to_bytes(text, max_bytes)
@@ -83,22 +82,24 @@ end
 
 function M.get_buffer_context(bufnr, config)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local limited_lines, did_trim_lines = limit_lines(lines, config.max_context_lines)
-  local content, did_trim_bytes = truncate_to_bytes(table.concat(limited_lines, "\n"), config.max_context_bytes)
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local surrounding_lines = config.context.ask.surrounding_lines
+  local nearby_lines, start_line, end_line = slice_lines_around(lines, cursor_line, surrounding_lines)
+  local content, did_trim_bytes = truncate_to_bytes(table.concat(nearby_lines, "\n"), config.context.max_bytes)
   local filename = vim.api.nvim_buf_get_name(bufnr)
 
   local parts = {
     string.format("File: %s", filename),
     string.format("Cwd: %s", vim.fn.getcwd()),
     string.format("Filetype: %s", filetype_for(bufnr)),
-    content_block("File content", content),
+    string.format("Current line: %d", cursor_line),
+    content_block(string.format("Nearby context (%d-%d)", start_line, end_line), content),
   }
 
-  if did_trim_lines or did_trim_bytes then
+  if did_trim_bytes then
     parts[#parts + 1] = string.format(
-      "NOTE: Context was trimmed for speed (max_lines=%d, max_bytes=%d).",
-      config.max_context_lines,
-      config.max_context_bytes
+      "NOTE: Context was trimmed for speed (max_bytes=%d).",
+      config.context.max_bytes
     )
   end
 
@@ -113,13 +114,14 @@ function M.get_visual_context(bufnr, config)
   local filename = vim.api.nvim_buf_get_name(bufnr)
   local all_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local selection_range = M.get_visual_selection_range() or { start = 1, ["end"] = #all_lines }
-  local before = math.max(1, selection_range.start - config.selection_context_lines)
-  local after = math.min(#all_lines, selection_range["end"] + config.selection_context_lines)
+  local surrounding_lines = config.context.selection.surrounding_lines
+  local before = math.max(1, selection_range.start - surrounding_lines)
+  local after = math.min(#all_lines, selection_range["end"] + surrounding_lines)
 
   local nearby_lines = vim.api.nvim_buf_get_lines(bufnr, before - 1, after, false)
   local selected_lines = vim.api.nvim_buf_get_lines(bufnr, selection_range.start - 1, selection_range["end"], false)
-  local nearby_text, nearby_trimmed = truncate_to_bytes(table.concat(nearby_lines, "\n"), config.max_context_bytes)
-  local selected_text, selected_trimmed = truncate_to_bytes(table.concat(selected_lines, "\n"), config.max_context_bytes)
+  local nearby_text, nearby_trimmed = truncate_to_bytes(table.concat(nearby_lines, "\n"), config.context.max_bytes)
+  local selected_text, selected_trimmed = truncate_to_bytes(table.concat(selected_lines, "\n"), config.context.max_bytes)
 
   local parts = {
     string.format("File: %s", filename),
@@ -133,7 +135,7 @@ function M.get_visual_context(bufnr, config)
   if nearby_trimmed or selected_trimmed then
     parts[#parts + 1] = string.format(
       "NOTE: Selection context was trimmed for speed (max_bytes=%d).",
-      config.max_context_bytes
+      config.context.max_bytes
     )
   end
 

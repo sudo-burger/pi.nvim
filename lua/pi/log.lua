@@ -1,13 +1,13 @@
 local M = {}
 
+M.DEFAULT_PATH = "/tmp/pi-nvim.log"
+
 local function format_time()
   return os.date("%Y-%m-%d %H:%M:%S")
 end
 
 function M.append_session(log_path, session, message, status, source_path)
-  if not log_path or log_path == "" then
-    return
-  end
+  log_path = log_path or M.DEFAULT_PATH
 
   local lines = {
     "",

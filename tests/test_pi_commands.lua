@@ -31,6 +31,10 @@ local function setup_buffer(lines, filename)
   )
 end
 
+local function set_cursor(line, col)
+  child.api.nvim_win_set_cursor(0, { line, col or 0 })
+end
+
 local function mock_system()
   child.lua([[
     _G.__pi_test_system = {
@@ -193,6 +197,7 @@ end
 local function test_pi_ask_includes_context_and_message()
   setup_test_env()
   setup_buffer({ "local x = 1", "local y = 2" }, "/test/file.lua")
+  set_cursor(2)
 
   local system = run_pi_ask("what does this do")
   local prompt = decode_prompt(system.get_stdin())
@@ -200,6 +205,7 @@ local function test_pi_ask_includes_context_and_message()
   MiniTest.expect.equality(prompt.type, "prompt")
   MiniTest.expect.equality(prompt.message:match("what does this do"), "what does this do")
   MiniTest.expect.equality(prompt.message:match("File: /test/file.lua"), "File: /test/file.lua")
+  MiniTest.expect.equality(prompt.message:match("Current line: 2"), "Current line: 2")
   MiniTest.expect.equality(prompt.message:match("local x = 1"), "local x = 1")
   MiniTest.expect.equality(prompt.message:match("running inside the pi.nvim Neovim plugin"), nil)
 end
@@ -220,8 +226,9 @@ local function test_pi_ask_requires_file()
 end
 
 local function test_context_is_trimmed_for_speed()
-  setup_test_env('require("pi").setup({ max_context_lines = 2, max_context_bytes = 16 })')
+  setup_test_env('require("pi").setup({ context = { max_bytes = 16, ask = { surrounding_lines = 2 } } })')
   setup_buffer({ "line one", "line two", "line three" }, "/test/trim.lua")
+  set_cursor(2)
 
   local system = run_pi_ask("trim it")
   local prompt = decode_prompt(system.get_stdin())
@@ -230,7 +237,7 @@ local function test_context_is_trimmed_for_speed()
 end
 
 local function test_selection_uses_nearby_context()
-  setup_test_env('require("pi").setup({ selection_context_lines = 1, max_context_bytes = 1000 })')
+  setup_test_env('require("pi").setup({ context = { max_bytes = 1000, selection = { surrounding_lines = 1 } } })')
   setup_buffer({ "line1", "line2", "line3", "line4", "line5", "line6" }, "/test/select.lua")
 
   local system = run_pi_ask_selection("focus selection", 3, 4)
@@ -404,6 +411,22 @@ local function test_second_request_is_blocked_while_running()
   MiniTest.expect.equality(notification.msg:match("already running"), "already running")
 end
 
+local function test_pi_ask_uses_context_around_cursor()
+  setup_test_env('require("pi").setup({ context = { ask = { surrounding_lines = 1 }, max_bytes = 1000 } })')
+  setup_buffer({ "line1", "line2", "line3", "line4", "line5", "line6" }, "/test/cursor.lua")
+  set_cursor(4)
+
+  local system = run_pi_ask("focus here")
+  local prompt = decode_prompt(system.get_stdin())
+
+  MiniTest.expect.equality(prompt.message:match("Current line: 4"), "Current line: 4")
+  MiniTest.expect.equality(prompt.message:match("Nearby context %(3%-5%)"), "Nearby context (3-5)")
+  MiniTest.expect.equality(prompt.message:match("line2"), nil)
+  MiniTest.expect.equality(prompt.message:match("line3"), "line3")
+  MiniTest.expect.equality(prompt.message:match("line5"), "line5")
+  MiniTest.expect.equality(prompt.message:match("line6"), nil)
+end
+
 local function test_success_overwrites_modified_buffer_with_disk_edits()
   setup_test_env()
   local file = child.lua_get([[vim.fn.tempname() .. ".lua"]])
@@ -475,6 +498,7 @@ T["PiAsk"]["uses vim.system command"] = test_pi_ask_uses_vim_system_command
 T["PiAsk"]["includes prompt message and context"] = test_pi_ask_includes_context_and_message
 T["PiAsk"]["requires a file"] = test_pi_ask_requires_file
 T["PiAsk"]["trims context for speed"] = test_context_is_trimmed_for_speed
+T["PiAsk"]["uses context around cursor"] = test_pi_ask_uses_context_around_cursor
 T["PiAsk"]["blocks second request while running"] = test_second_request_is_blocked_while_running
 T["PiAsk"]["overwrites modified buffer with disk edits on success"] = test_success_overwrites_modified_buffer_with_disk_edits
 T["PiAsk"]["reloads unmodified buffer on success"] = test_success_reloads_unmodified_buffer

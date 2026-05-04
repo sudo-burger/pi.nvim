@@ -175,7 +175,7 @@ local function finish_session(session, status, opts)
   end
   last_session = session
 
-  log.append_session(config.get().log_path, session, session.last_message, status, session.source_path)
+  log.append_session(nil, session, session.last_message, status, session.source_path)
 end
 
 local function start_session(message, build_context)
@@ -195,7 +195,7 @@ local function start_session(message, build_context)
   session.last_message = message
   active_session = session
   last_session = session
-  ui.open(session, config.get().focus_ui)
+  ui.open(session)
   set_status(session, "collecting_context")
 
   local ok, built_context = pcall(build_context)
@@ -334,11 +334,7 @@ function M._get_last_session()
 end
 
 function M.show_log()
-  local log_path = config.get().log_path
-  if not log_path or log_path == "" then
-    vim.notify("pi.nvim: log_path not configured", vim.log.levels.ERROR)
-    return
-  end
+  local log_path = log.DEFAULT_PATH
 
   if vim.fn.filereadable(log_path) == 0 then
     vim.notify("pi.nvim: log file not found at " .. log_path, vim.log.levels.INFO)
