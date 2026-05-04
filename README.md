@@ -50,13 +50,13 @@ All config is optional:
 require("pi").setup()
 ```
 
-Override only what you need:
+Override only the ones you need:
 
 ```lua
 require("pi").setup({
   provider = "openrouter",
   model = "openrouter/free",
-  thinking = "off",
+  thinking = "off", -- be careful, thinking is time-consuming, it's not a great experience if you want simplicity
   system_prompt = "You are a helpful assistant.",
   append_system_prompt = "Always respond concisely.",
   context = {
@@ -77,7 +77,7 @@ require("pi").setup({
 |------|---------|-------------|
 | `provider` | `nil` | pi provider to use. If omitted, pi uses its own default configuration. |
 | `model` | `nil` | Model name to use. If omitted, pi uses its own default configuration. |
-| `thinking` | `nil` | Sets pi's thinking level (`--thinking`). Supported values: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`. |
+| `thinking` | `"off"` | Sets pi's thinking level (`--thinking`). Supported values: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`. |
 | `system_prompt` | `nil` | Passes a custom system prompt to pi (`--system-prompt`). Use with care, since this overrides pi's generated baseline instructions. |
 | `append_system_prompt` | `nil` | Appends text to the system prompt (`--append-system-prompt`). pi.nvim always appends its non-interactive execution instruction, and this option is concatenated after it. |
 | `context.max_bytes` | `24000` | Maximum size in bytes for sent context before trimming. |
@@ -95,7 +95,7 @@ This is basically the same as doing `pi --provider <provider> --model <model>`, 
 -- OpenRouter kimi-k2.5
 { provider = "openrouter", model = "moonshotai/kimi-k2.5" }
 
--- OpenAI with explicit thinking level
+-- OpenAI overriding the default thinking level
 { provider = "openai", model = "gpt-5-mini", thinking = "high" }
 
 -- OpenRouter haiku-4.5
