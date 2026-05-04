@@ -1,8 +1,18 @@
 local M = {}
 
+local VALID_THINKING_LEVELS = {
+  off = true,
+  minimal = true,
+  low = true,
+  medium = true,
+  high = true,
+  xhigh = true,
+}
+
 M.defaults = {
   provider = nil,
   model = nil,
+  thinking = nil,
   system_prompt = nil,
   append_system_prompt = nil,
   context = {
@@ -16,7 +26,6 @@ M.defaults = {
   },
   skills = true,
   extensions = true,
-  tools = true,
 }
 
 local values = vim.deepcopy(M.defaults)
@@ -59,8 +68,13 @@ function M.validate(opts)
   if opts.extensions ~= nil and type(opts.extensions) ~= "boolean" then
     error("pi.nvim: extensions must be a boolean")
   end
-  if opts.tools ~= nil and type(opts.tools) ~= "boolean" then
-    error("pi.nvim: tools must be a boolean")
+  if opts.thinking ~= nil then
+    if type(opts.thinking) ~= "string" then
+      error("pi.nvim: thinking must be a string")
+    end
+    if not VALID_THINKING_LEVELS[opts.thinking] then
+      error("pi.nvim: thinking must be one of: off, minimal, low, medium, high, xhigh")
+    end
   end
   if opts.system_prompt ~= nil and type(opts.system_prompt) ~= "string" then
     error("pi.nvim: system_prompt must be a string")

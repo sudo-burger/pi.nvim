@@ -56,6 +56,7 @@ Override only what you need:
 require("pi").setup({
   provider = "openrouter",
   model = "openrouter/free",
+  thinking = "off",
   system_prompt = "You are a helpful assistant.",
   append_system_prompt = "Always respond concisely.",
   context = {
@@ -69,7 +70,6 @@ require("pi").setup({
   },
   skills = true,
   extensions = true,
-  tools = true,
 })
 ```
 
@@ -77,6 +77,7 @@ require("pi").setup({
 |------|---------|-------------|
 | `provider` | `nil` | pi provider to use. If omitted, pi uses its own default configuration. |
 | `model` | `nil` | Model name to use. If omitted, pi uses its own default configuration. |
+| `thinking` | `nil` | Sets pi's thinking level (`--thinking`). Supported values: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`. |
 | `system_prompt` | `nil` | Passes a custom system prompt to pi (`--system-prompt`). Use with care, since this overrides pi's generated baseline instructions. |
 | `append_system_prompt` | `nil` | Appends text to the system prompt (`--append-system-prompt`). pi.nvim always appends its non-interactive execution instruction, and this option is concatenated after it. |
 | `context.max_bytes` | `24000` | Maximum size in bytes for sent context before trimming. |
@@ -84,7 +85,6 @@ require("pi").setup({
 | `context.selection.surrounding_lines` | `40` | Number of lines before and after the current visual selection to include for `:PiAskSelection`. |
 | `skills` | `true` | Whether pi discovers and loads skills. Set to `false` to pass `--no-skills`. |
 | `extensions` | `true` | Whether pi discovers and loads extensions. Set to `false` to pass `--no-extensions`. |
-| `tools` | `true` | Whether pi enables built-in tools. Set to `false` to pass `--no-tools`. |
 
 Use `pi --list-models` to see available models.
 
@@ -94,6 +94,9 @@ This is basically the same as doing `pi --provider <provider> --model <model>`, 
 ```lua
 -- OpenRouter kimi-k2.5
 { provider = "openrouter", model = "moonshotai/kimi-k2.5" }
+
+-- OpenAI with explicit thinking level
+{ provider = "openai", model = "gpt-5-mini", thinking = "high" }
 
 -- OpenRouter haiku-4.5
 { provider = "openrouter", model = "anthropic/claude-haiku-4.5" }

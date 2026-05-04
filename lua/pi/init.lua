@@ -42,9 +42,6 @@ local function get_pi_cmd()
   if not cfg.skills then
     table.insert(cmd, "--no-skills")
   end
-  if not cfg.tools then
-    table.insert(cmd, "--no-tools")
-  end
   if cfg.provider then
     table.insert(cmd, "--provider")
     table.insert(cmd, cfg.provider)
@@ -52,6 +49,10 @@ local function get_pi_cmd()
   if cfg.model then
     table.insert(cmd, "--model")
     table.insert(cmd, cfg.model)
+  end
+  if cfg.thinking then
+    table.insert(cmd, "--thinking")
+    table.insert(cmd, cfg.thinking)
   end
   if cfg.system_prompt then
     table.insert(cmd, "--system-prompt")

@@ -372,14 +372,23 @@ local function test_extensions_option_disables_extensions()
   MiniTest.expect.no_equality(has_arg(cmd, "--no-extensions"), nil)
 end
 
-local function test_tools_option_disables_tools()
-  setup_test_env('require("pi").setup({ tools = false })')
+local function test_thinking_option_adds_cli_flag()
+  setup_test_env('require("pi").setup({ thinking = "high" })')
   setup_buffer({ "code" }, "/test/file.lua")
 
   local system = run_pi_ask("test")
   local cmd = system.get_cmd()
+  local thinking_idx = has_arg(cmd, "--thinking")
 
-  MiniTest.expect.no_equality(has_arg(cmd, "--no-tools"), nil)
+  MiniTest.expect.no_equality(thinking_idx, nil)
+  MiniTest.expect.equality(cmd[thinking_idx + 1], "high")
+end
+
+local function test_invalid_thinking_option_errors()
+  local ok, err = pcall(setup_test_env, 'require("pi").setup({ thinking = "turbo" })')
+
+  MiniTest.expect.equality(ok, false)
+  MiniTest.expect.no_equality(tostring(err):match("thinking must be one of"), nil)
 end
 
 local function test_append_system_prompt_is_concatenated()
@@ -527,7 +536,8 @@ T["PiAsk"]["reloaded buffer can be written without changed-since-reading warning
 T["PiAsk"]["reloads all changed loaded buffers on success"] = test_success_reloads_all_changed_loaded_buffers
 T["PiAsk"]["skills option disables skills"] = test_skills_option_disables_skills
 T["PiAsk"]["extensions option disables extensions"] = test_extensions_option_disables_extensions
-T["PiAsk"]["tools option disables tools"] = test_tools_option_disables_tools
+T["PiAsk"]["thinking option adds cli flag"] = test_thinking_option_adds_cli_flag
+T["PiAsk"]["invalid thinking option errors"] = test_invalid_thinking_option_errors
 T["PiAsk"]["append_system_prompt is concatenated with plugin prompt"] = test_append_system_prompt_is_concatenated
 
 T["PiAskSelection"] = MiniTest.new_set()
