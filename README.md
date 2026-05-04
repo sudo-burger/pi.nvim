@@ -3,7 +3,7 @@
 A Neovim plugin for interacting with [pi](https://pi.dev) - the minimal cli agent.
 
 <p align="center">
-<a href="https://asciinema.org/a/IiFqBFBZzC7DIYEh">
+<a href="https://asciinema.org/a/RuG4c2kkhrLx1ChZ">
   <img src="https://github.com/pablopunk/pi.nvim/blob/main/assets/asciinema.gif?raw=true&forceUpdate" width="100%" />
 </a>
 </p>
