@@ -116,18 +116,17 @@ local function reload_buffer_from_disk(bufnr, path)
     return false
   end
 
-  local ok, lines = pcall(vim.fn.readfile, path)
-  if not ok then
-    return false
-  end
+  local ok = pcall(function()
+    vim.api.nvim_buf_call(bufnr, function()
+      local view = vim.api.nvim_get_current_buf() == bufnr and vim.fn.winsaveview() or nil
+      vim.cmd("silent edit!")
+      if view then
+        vim.fn.winrestview(view)
+      end
+    end)
+  end)
 
-  local was_modifiable = vim.bo[bufnr].modifiable
-  vim.bo[bufnr].modifiable = true
-  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-  vim.bo[bufnr].modified = false
-  vim.bo[bufnr].modifiable = was_modifiable
-
-  return true
+  return ok
 end
 
 local function reload_changed_file_buffers(session)

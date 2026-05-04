@@ -491,6 +491,27 @@ local function test_success_reloads_unmodified_buffer()
   MiniTest.expect.equality(lines[1], "updated on disk")
 end
 
+local function test_reloaded_buffer_can_be_written_without_changed_since_reading_warning()
+  setup_test_env()
+  local file = child.lua_get([[vim.fn.tempname() .. ".lua"]])
+  write_file(file, { "before" })
+  setup_buffer({ "before" }, file)
+  child.lua([[vim.bo.modified = false]])
+
+  local system = run_pi_ask("finish")
+  write_file(file, { "after agent edit" })
+  system.stdout('{"type":"agent_end"}\n')
+  system.exit(0, 0)
+
+  child.lua([[_G.__pi_test_notifications = {}]])
+  child.lua([[vim.api.nvim_buf_set_lines(0, 0, -1, false, { "after local write" })]])
+  local ok, err = child.lua([[return pcall(vim.cmd, "write")]])
+
+  MiniTest.expect.equality(ok, true)
+  MiniTest.expect.equality(err, nil)
+  MiniTest.expect.equality(last_notification(), nil)
+end
+
 local T = MiniTest.new_set()
 
 T["PiAsk"] = MiniTest.new_set()
@@ -502,6 +523,7 @@ T["PiAsk"]["uses context around cursor"] = test_pi_ask_uses_context_around_curso
 T["PiAsk"]["blocks second request while running"] = test_second_request_is_blocked_while_running
 T["PiAsk"]["overwrites modified buffer with disk edits on success"] = test_success_overwrites_modified_buffer_with_disk_edits
 T["PiAsk"]["reloads unmodified buffer on success"] = test_success_reloads_unmodified_buffer
+T["PiAsk"]["reloaded buffer can be written without changed-since-reading warning"] = test_reloaded_buffer_can_be_written_without_changed_since_reading_warning
 T["PiAsk"]["reloads all changed loaded buffers on success"] = test_success_reloads_all_changed_loaded_buffers
 T["PiAsk"]["skills option disables skills"] = test_skills_option_disables_skills
 T["PiAsk"]["extensions option disables extensions"] = test_extensions_option_disables_extensions
