@@ -3,6 +3,8 @@ local M = {}
 M.defaults = {
   provider = nil,
   model = nil,
+  system_prompt = nil,
+  append_system_prompt = nil,
   max_context_lines = 300,
   max_context_bytes = 24000,
   selection_context_lines = 40,
@@ -42,6 +44,12 @@ function M.validate(opts)
   end
   if opts.tools ~= nil and type(opts.tools) ~= "boolean" then
     error("pi.nvim: tools must be a boolean")
+  end
+  if opts.system_prompt ~= nil and type(opts.system_prompt) ~= "string" then
+    error("pi.nvim: system_prompt must be a string")
+  end
+  if opts.append_system_prompt ~= nil and type(opts.append_system_prompt) ~= "string" then
+    error("pi.nvim: append_system_prompt must be a string")
   end
 end
 
