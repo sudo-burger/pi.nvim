@@ -192,6 +192,7 @@ local function test_pi_ask_uses_vim_system_command()
   local append_idx = has_arg(cmd, "--append-system-prompt")
   MiniTest.expect.no_equality(append_idx, nil)
   MiniTest.expect.no_equality(cmd[append_idx + 1]:match("running inside the pi.nvim Neovim plugin"), nil)
+  MiniTest.expect.no_equality(cmd[append_idx + 1]:match("Treat the provided Context as the source of truth"), nil)
 end
 
 local function test_pi_ask_includes_context_and_message()
@@ -206,6 +207,8 @@ local function test_pi_ask_includes_context_and_message()
   MiniTest.expect.equality(prompt.message:match("what does this do"), "what does this do")
   MiniTest.expect.equality(prompt.message:match("File: /test/file.lua"), "File: /test/file.lua")
   MiniTest.expect.equality(prompt.message:match("Current line: 2"), "Current line: 2")
+  MiniTest.expect.equality(prompt.message:match("source of truth"), "source of truth")
+  MiniTest.expect.equality(prompt.message:match("may include unsaved changes"), "may include unsaved changes")
   MiniTest.expect.equality(prompt.message:match("local x = 1"), "local x = 1")
   MiniTest.expect.equality(prompt.message:match("running inside the pi.nvim Neovim plugin"), nil)
 end
@@ -413,6 +416,7 @@ local function test_append_system_prompt_is_concatenated()
 
   MiniTest.expect.no_equality(append_idx, nil)
   MiniTest.expect.no_equality(cmd[append_idx + 1]:match("running inside the pi.nvim Neovim plugin"), nil)
+  MiniTest.expect.no_equality(cmd[append_idx + 1]:match("Treat the provided Context as the source of truth"), nil)
   MiniTest.expect.no_equality(cmd[append_idx + 1]:match("Always run tests"), nil)
 end
 

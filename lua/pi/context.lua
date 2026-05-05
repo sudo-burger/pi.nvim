@@ -1,6 +1,10 @@
 local M = {}
 
-local SYSTEM_PROMPT = [[You are running inside the pi.nvim Neovim plugin. The user has sent a request and will not be able to reply back. You must complete the task immediately without asking any questions or requesting clarification. Take action now and do what was asked.]]
+local SYSTEM_PROMPT = [[You are running inside the pi.nvim Neovim plugin. The user has sent a request and will not be able to reply back. You must complete the task immediately without asking any questions or requesting clarification. Take action now and do what was asked.
+
+IMPORTANT: Any file content included in the provided Context comes from the user's current Neovim buffer and may be newer than the on-disk file. Treat the provided Context as the source of truth for that file content. Do not read the same file just to verify its contents before editing, because the filesystem copy may be stale if the user has unsaved changes. Base edits on the provided buffer/selection content whenever possible.]]
+
+local BUFFER_SOURCE_OF_TRUTH_NOTE = [[NOTE: The context below comes from the current Neovim buffer and may include unsaved changes that are newer than the on-disk file. Treat this context as the source of truth for the file content, and do not read the same file only to confirm its current contents before editing.]]
 
 local EMPTY_FILE_NOTE = [[NOTE: This file is currently empty. Please create or populate it directly by applying the necessary edits so pi.nvim can write the file.]]
 
@@ -93,6 +97,7 @@ function M.get_buffer_context(bufnr, config)
     string.format("Cwd: %s", vim.fn.getcwd()),
     string.format("Filetype: %s", filetype_for(bufnr)),
     string.format("Current line: %d", cursor_line),
+    BUFFER_SOURCE_OF_TRUTH_NOTE,
     content_block(string.format("Nearby context (%d-%d)", start_line, end_line), content),
   }
 
@@ -128,6 +133,7 @@ function M.get_visual_context(bufnr, config)
     string.format("Cwd: %s", vim.fn.getcwd()),
     string.format("Filetype: %s", filetype_for(bufnr)),
     string.format("Selected lines: %d-%d", selection_range.start, selection_range["end"]),
+    BUFFER_SOURCE_OF_TRUTH_NOTE,
     content_block("Selected content", selected_text),
     content_block(string.format("Nearby context (%d-%d)", before, after), nearby_text),
   }
