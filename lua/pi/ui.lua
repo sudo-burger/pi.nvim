@@ -106,15 +106,16 @@ local function render_float(session)
     return
   end
 
-  local lines = { status_line(session) }
-  local start_idx = math.max(1, #session.history - 3)
-  for i = start_idx, #session.history do
-    -- Handle multi-line messages.
-    local msg_lines = vim.split(session.history[i]
-    for _, line in msg_lines do
-      lines[#lines + 1] = line
-    end
-  end
+	-- Handle multi-line status "line".
+	local lines = vim.split(status_line(session) or "", "\n")
+	local start_idx = math.max(1, #session.history - 3)
+	for i = start_idx, #session.history do
+		-- Handle multi-line messages.
+		local msg_lines = vim.split(session.history[i] or "", "\n")
+		for _, line in pairs(msg_lines) do
+			lines[#lines + 1] = line
+		end
+	end
 
   vim.bo[session.bufnr].modifiable = true
   vim.api.nvim_buf_set_lines(session.bufnr, 0, -1, false, lines)
