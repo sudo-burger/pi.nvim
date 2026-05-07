@@ -109,7 +109,11 @@ local function render_float(session)
   local lines = { status_line(session) }
   local start_idx = math.max(1, #session.history - 3)
   for i = start_idx, #session.history do
-    lines[#lines + 1] = session.history[i]
+    -- Handle multi-line messages.
+    local msg_lines = vim.split(session.history[i]
+    for _, line in msg_lines do
+      lines[#lines + 1] = line
+    end
   end
 
   vim.bo[session.bufnr].modifiable = true
